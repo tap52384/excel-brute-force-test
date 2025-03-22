@@ -1,6 +1,8 @@
 from itertools import product, chain
 import csv
 import os
+import string
+import time
 from typing import Generator
 from msoffcrypto.format.ooxml import OOXMLFile
 import msoffcrypto
@@ -17,7 +19,7 @@ def case_variations(word):
         return [""]
     return map("".join, product(*((char.lower(), char.upper()) for char in word)))
 
-def generate_passwords(password_bases: list[str], prefixes: list[str], suffixes: list[str]):
+def generate_passwords(password_bases: list[str], prefixes: list[str], suffixes: list[str]) -> Generator[str, None, None]:
     """
     Generates a list of passwords based on combinations of base passwords, prefixes, suffixes,
     and their case variations.
@@ -47,6 +49,26 @@ def generate_passwords(password_bases: list[str], prefixes: list[str], suffixes:
     # Generate all combinations of prefixes, base passwords, and suffixes
     for prefix, base, suffix in product(prefixes_variations, base_variations, suffixes_variations):
         yield f"{prefix}{base}{suffix}"
+
+def generate_all_passwords(max_length: int = 10) -> Generator[str, None, None]:
+    """
+    Generates all possible passwords starting with a letter and up to a given length.
+    Includes all ASCII printable characters except whitespace and control characters.
+
+    :param max_length: Maximum length of the passwords to generate (default is 10).
+    :return: A generator yielding password combinations.
+    """
+
+    # Define the character set: all printable ASCII characters except whitespace and control characters
+    valid_chars = string.ascii_letters + string.digits + string.punctuation
+
+    # Generate passwords starting with a letter and up to max_length characters
+    for length in range(1, max_length + 1):
+        for password in product(valid_chars, repeat=length):
+            if password[0].isalpha():  # Ensure the password starts with a letter
+                yield ''.join(password)
+
+
 
 def file_is_encrypted(file_path:str) -> bool:
     """
@@ -112,9 +134,6 @@ def test_passwords(excel_file, password_list: Generator[str]):
     :param password_list: A list of passwords to test.
     """
 
-    # if not password_list:
-    #     password_list = []
-
     # Get the list of passwords already checked; this can save time by not checking passwords again
     checked_passwords = get_checked_passwords(excel_file)
 
@@ -123,6 +142,9 @@ def test_passwords(excel_file, password_list: Generator[str]):
 
     num_checked = 0
     num_skipped = 0
+
+    # Used to determine how long it takes to check all of the passwords
+    start_time = time.perf_counter()
 
     # This opens both the Excel file we will be attempting to find the password for
     # and the file we will be writing the checked passwords to
@@ -140,10 +162,14 @@ def test_passwords(excel_file, password_list: Generator[str]):
 
                 # This will attempt to verify the password
                 # https://msoffcrypto-tool.readthedocs.io/en/latest/index.html#id1
-                file.load_key(password=password, verify_password=True)
                 num_checked += 1
-                print(f"Success! The correct password is: '{password}'")
-                print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords.")
+                file.load_key(password=password, verify_password=True)
+
+                end_time = time.perf_counter()
+                elapsed_time = end_time - start_time
+
+                print(f"***SUCCESS*** The correct password is: '{password}'")
+                print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords in {elapsed_time:.2f} seconds.")
                 return
 
             except msoffcrypto.exceptions.DecryptionError as e:
@@ -155,7 +181,9 @@ def test_passwords(excel_file, password_list: Generator[str]):
             checked_file.write(f"{password}\n")
 
     print("None of the passwords worked.")
-    print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords.")
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords in {elapsed_time:.2f} seconds.")
 
 # Example usage
 if __name__ == "__main__":
@@ -164,7 +192,7 @@ if __name__ == "__main__":
 
     # Optional prefixes, suffixes, and numbers
     PREFIXES = ["",]
-    SUFFIXES = ["", "2021", "202!", "131", "13!", "1819", "1819!", "!31", "!3!", "131!", "!131", "!131!"]
+    SUFFIXES = ["", "2021", "202!", "131", "13!", "1819", "1819!", "!31", "!3!", "131!", "!131", "!131!", "1E!", "!31!", "1331", "!331", "1331!"]
     # numbers = ["",]
 
     # Path to the Excel file
@@ -180,5 +208,8 @@ if __name__ == "__main__":
     # 2. Now that we have confirmed the file is encrypted, we can generate passwords
     all_passwords = generate_passwords(BASE_PASSWORDS, prefixes=PREFIXES, suffixes=SUFFIXES)
 
+    # 3. Attempt to generate all passwords starting with a letter and up to a given length
+    comprehensive_passwords = generate_all_passwords(max_length=10)
+
     # 3. Loop through the password list and test all of the passwords until we find the right one
-    test_passwords(excel_file=EXCEL_FILE_PATH, password_list=all_passwords)
+    test_passwords(excel_file=EXCEL_FILE_PATH, password_list=comprehensive_passwords)
