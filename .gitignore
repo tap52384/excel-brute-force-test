@@ -178,3 +178,4 @@ cython_debug/
 *.xls
 *.xlsm
 *.xlsb
+checked_files/
