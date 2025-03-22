@@ -36,14 +36,13 @@ def generate_passwords(password_bases: list[str], prefixes: list[str], suffixes:
     """
     prefixes = prefixes or [""]
     suffixes = suffixes or [""]
+    # The set() function is used to remove duplicates
     prefixes_variations = set(chain.from_iterable(
         case_variations(prefix) for prefix in prefixes))
     base_variations = set(chain.from_iterable(
         case_variations(base) for base in password_bases))
     suffixes_variations = set(chain.from_iterable(
         case_variations(suffix) for suffix in suffixes))
-    # base_variations = chain.from_iterable(case_variations(base) for base in password_bases)
-    # suffixes_variations = chain.from_iterable(case_variations(suffix) for suffix in suffixes)
 
     # Generate all combinations of prefixes, base passwords, and suffixes
     for prefix, base, suffix in product(prefixes_variations, base_variations, suffixes_variations):
@@ -122,6 +121,9 @@ def test_passwords(excel_file, password_list: Generator[str]):
     file_name = os.path.basename(excel_file)
     checked_file_path = os.path.join(OUTPUT_FOLDER, f"{file_name}.csv")
 
+    num_checked = 0
+    num_skipped = 0
+
     # This opens both the Excel file we will be attempting to find the password for
     # and the file we will be writing the checked passwords to
     with open(excel_file, "rb") as f, \
@@ -133,10 +135,15 @@ def test_passwords(excel_file, password_list: Generator[str]):
 
                 # Skip the password if it has already been checked
                 if password in checked_passwords:
+                    num_skipped += 1
                     continue
 
+                # This will attempt to verify the password
+                # https://msoffcrypto-tool.readthedocs.io/en/latest/index.html#id1
                 file.load_key(password=password, verify_password=True)
+                num_checked += 1
                 print(f"Success! The correct password is: '{password}'")
+                print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords.")
                 return
 
             except msoffcrypto.exceptions.DecryptionError as e:
@@ -148,6 +155,7 @@ def test_passwords(excel_file, password_list: Generator[str]):
             checked_file.write(f"{password}\n")
 
     print("None of the passwords worked.")
+    print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords.")
 
 # Example usage
 if __name__ == "__main__":
@@ -156,7 +164,7 @@ if __name__ == "__main__":
 
     # Optional prefixes, suffixes, and numbers
     PREFIXES = ["",]
-    SUFFIXES = ["", "2021", "202!", "131", "13!", "1819", "1819!"]
+    SUFFIXES = ["", "2021", "202!", "131", "13!", "1819", "1819!", "!31", "!3!", "131!", "!131", "!131!"]
     # numbers = ["",]
 
     # Path to the Excel file
