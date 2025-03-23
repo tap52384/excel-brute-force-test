@@ -1,7 +1,11 @@
 # excel-brute-force-test
 
 Python script for figuring out the password of a password-locked Excel file via
-brute force.
+brute force. The secret sauce is the [msoffcrypto-tool](https://msoffcrypto-tool.readthedocs.io/en/latest/index.html#id1) package for Python for checking whether a password is the correct
+one for an Office document.
+
+This script could probably be enhanced to take a string as a prefix for a password
+as a parameter so that it can be run from the command line.
 
 ## Create a virtualenv and install packages
 

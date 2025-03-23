@@ -238,11 +238,11 @@ def test_passwords(excel_file, password_list: Generator[str]):
 if __name__ == "__main__":
     # User-provided base passwords
     # BASE_PASSWORDS = ["unccu", "baritone", "admin"]
-    BASE_PASSWORDS = ["unc"]
+    BASE_PASSWORDS = ["baritone"]
 
     # Optional prefixes, suffixes, and numbers
-    PREFIXES = ["",]
-    SUFFIXES = ["", "2021", "202!", "131", "13!", "1819", "1819!", "!31", "!3!", "131!", "!131", "!131!", "1E!", "!31!", "1331", "!331", "1331!"]
+    # PREFIXES = ["",]
+    # SUFFIXES = ["", "2021", "202!", "131", "13!", "1819", "1819!", "!31", "!3!", "131!", "!131", "!131!", "1E!", "!31!", "1331", "!331", "1331!"]
     # numbers = ["",]
 
     # Path to the Excel file
@@ -257,10 +257,9 @@ if __name__ == "__main__":
 
     # 2. Now that we have confirmed the file is encrypted, we can generate passwords
     # By specifying only prefixes, we can generate all passwords with the given prefixes
+    # Therefore, to generate all passwords starting with a letter, add the letter as an element of
+    # the BASE_PASSWORDS list
     all_passwords = generate_passwords(BASE_PASSWORDS, [], max_length=11)
-
-    # 3. Attempt to generate all passwords starting with a letter and up to a given length
-    # comprehensive_passwords = generate_all_passwords(max_length=10)
 
     # 3. Loop through the password list and test all of the passwords until we find the right one
     test_passwords(excel_file=EXCEL_FILE_PATH, password_list=all_passwords)
