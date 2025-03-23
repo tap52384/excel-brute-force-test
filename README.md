@@ -45,4 +45,8 @@ pip install -r requirements.txt
 # Deactivate the virtualenv from the terminal if you will select it as the interpreter within
 # VS Code
 pyenv deactivate excel-brute-force-test
+
+# Or, you can run the script from within the virtualenv
+pyenv activate excel-brute-force-test
+python main.py
 ```
