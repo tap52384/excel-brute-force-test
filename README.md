@@ -7,6 +7,23 @@ one for an Office document.
 This script could probably be enhanced to take a string as a prefix for a password
 as a parameter so that it can be run from the command line.
 
+## Usage
+
+From the terminal:
+
+```bash
+# Show all options
+python main.py
+
+# Generate all passwords for all case variations starting with abc and ending
+# with "123" with a maximum length of 7. This means that one character is
+# unaccounted for. All possible printable ASCII characters will be used when
+# generating password combinations.
+python main.py file.xlsx --prefixes "abc" --suffixes "123" --max_length 7
+```
+
+The file **launch.json** has been updated with example arguments to be passed to the Python script.
+
 ## Create a virtualenv and install packages
 
 These instructions were created using macOS 15.3.1:
