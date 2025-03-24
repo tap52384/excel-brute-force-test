@@ -15,7 +15,9 @@
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${cwd}/main.py",
+            // Where you add arguments to the program
+            "args": ["ANTV2.xlsx", "--prefixes", "unccu", "--suffixes", "131"],
             "console": "integratedTerminal"
         }
     ]

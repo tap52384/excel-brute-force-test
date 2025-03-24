@@ -1,7 +1,9 @@
 import itertools
+import argparse
 import csv
 import os
 import string
+import sys
 import time
 from typing import Generator, List, Optional
 from msoffcrypto.format.ooxml import OOXMLFile
@@ -12,8 +14,85 @@ OUTPUT_FOLDER = "checked_files"
 
  # Helper: produce all case variations for a string
 def case_variations(s: str):
+    """
+    Generate all case variations for a given string.
+    :param s: The input string.
+    :return: A generator yielding all case variations of the string.
+    """
     variants = [(ch.lower(), ch.upper()) if ch.isalpha() else (ch,) for ch in s]
     return (''.join(candidate) for candidate in itertools.product(*variants))
+
+def positive_int(value: str) -> int:
+    """
+    Argument type for positive integers. Used by the min_length and max_length parameters.
+
+    :param value: The input value to check.
+    :return: The positive integer value.
+    :raises argparse.ArgumentTypeError: If the value is not a positive integer.
+    """
+    try:
+        ivalue = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{value} is not a valid integer") from exc
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError("Value must be a positive integer greater than 0")
+    return ivalue
+
+def process_arg(arg_str: str) -> list[str]:
+    """
+    Processes a comma-separated argument string:
+      - Converts the entire string to lowercase.
+      - Splits it into a list on commas.
+      - Strips whitespace from each element.
+      - Deduplicates the list while preserving order.
+    """
+    # Convert to lowercase and split
+    items = [item.strip() for item in arg_str.casefold().split(",") if item.strip()]
+    # Remove duplicates while preserving order
+    return list(dict.fromkeys(items))
+
+
+def parse_args():
+    """
+    Parses command-line arguments. This sets the help text that is provided to the console.
+    :return: Parsed arguments.
+    """
+    parser = argparse.ArgumentParser(
+        description="Generates and checks passwords to unlock a password-protected Excel workbook."
+    )
+    # This is a positional argument and not an optional command line argument
+    # This means that when parser.parse_args() is called, the user must provide a file
+    # Otherwise, the script will not run and an error will be shown
+    parser.add_argument(
+        "file",
+        type=str,
+        help="The path to the password-protected Microsoft Office file. (e.g., file.xlsx)"
+    )
+    parser.add_argument(
+        "--prefixes",
+        type=str,
+        default="",
+        help="A string of comma-separated prefixes (e.g., 'Admin,root,User')."
+    )
+    parser.add_argument(
+        "--suffixes",
+        type=str,
+        default="",
+        help="A string of comma-separated suffixes (e.g., '123,XYZ')."
+    )
+    parser.add_argument(
+        "--max_length",
+        type=positive_int,
+        default=10,
+        help="Max length of the password (positive integer greater than 0)."
+    )
+
+    # If no arguments are provided, print the help message
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
+
+    return parser.parse_args()
 
 def generate_passwords(
     prefixes: Optional[List[str]] = None,
@@ -100,7 +179,7 @@ def generate_all_passwords(max_length: int = 10) -> Generator[str, None, None]:
     :return: A generator yielding password combinations.
     """
 
-    # Define the character set: all printable ASCII characters except whitespace and control characters
+    # Define the character set: all printable ASCII characters except whitespace and control chars
     valid_chars = string.ascii_letters + string.digits + string.punctuation
 
     # Generate passwords starting with a letter and up to max_length characters
@@ -234,32 +313,40 @@ def test_passwords(excel_file, password_list: Generator[str]):
     elapsed_time = end_time - start_time
     print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords in {elapsed_time:.2f} seconds ({(num_checked+num_skipped)/elapsed_time} pwds/sec).")
 
-# Example usage
-if __name__ == "__main__":
-    # User-provided base passwords
-    # BASE_PASSWORDS = ["unccu", "baritone", "admin"]
-    BASE_PASSWORDS = ["baritone"]
+def main():
+    """
+    Main entry point for this script. Using main() prevents the script from running when imported
+    and also prevents cluttering the global namespace.
+    """
+    args = parse_args()
 
-    # Optional prefixes, suffixes, and numbers
-    # PREFIXES = ["",]
-    # SUFFIXES = ["", "2021", "202!", "131", "13!", "1819", "1819!", "!31", "!3!", "131!", "!131", "!131!", "1E!", "!31!", "1331", "!331", "1331!"]
-    # numbers = ["",]
+    # Set the prefixes and suffixes to the user-provided values or defaults
+    prefixes = process_arg(args.prefixes) if args.prefixes else ["unccu"]
+    suffixes = process_arg(args.suffixes) if args.suffixes else []
 
-    # Path to the Excel file
-    EXCEL_FILE_PATH = "ANTV2.xlsx"  # Replace with your Excel file path
+    office_file = args.file if args.file else ""
+
+    max_length = args.max_length
+
+    print("Prefixes:", prefixes)
+    print("Suffixes:", suffixes)
+    print("Max Length:", max_length)
 
     # 1. Test if the file is encrypted
-    if not file_is_encrypted(EXCEL_FILE_PATH):
-        print("The file is not encrypted.")
+    if not file_is_encrypted(office_file):
+        print(f"The file is not encrypted: {office_file}")
         exit()
 
-    print(f"File is encrypted: {EXCEL_FILE_PATH}")
+    print(f"File is encrypted: {office_file}")
 
     # 2. Now that we have confirmed the file is encrypted, we can generate passwords
     # By specifying only prefixes, we can generate all passwords with the given prefixes
-    # Therefore, to generate all passwords starting with a letter, add the letter as an element of
-    # the BASE_PASSWORDS list
-    all_passwords = generate_passwords(BASE_PASSWORDS, [], max_length=11)
+    # Therefore, to generate all passwords starting with a letter, add the letter as a prefix
+    all_passwords = generate_passwords(prefixes, suffixes, max_length=max_length)
 
     # 3. Loop through the password list and test all of the passwords until we find the right one
-    test_passwords(excel_file=EXCEL_FILE_PATH, password_list=all_passwords)
+    test_passwords(excel_file=office_file, password_list=all_passwords)
+
+# Example usage
+if __name__ == "__main__":
+    main()
