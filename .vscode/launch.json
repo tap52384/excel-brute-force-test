@@ -8,16 +8,9 @@
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Python Debugger: Current File",
-            "type": "debugpy",
-            "request": "launch",
             "program": "${cwd}/main.py",
             // Where you add arguments to the program
-            "args": ["ANTV2.xlsx", "--prefixes", "unccu", "--suffixes", "131"],
+            "args": ["file.xlsx", "--prefixes", "one,two", "--suffixes", "three,four"],
             "console": "integratedTerminal"
         }
     ]
