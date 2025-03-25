@@ -259,6 +259,9 @@ def test_passwords(excel_file, password_list: Generator[str]):
 
     file_name = os.path.basename(excel_file)
     checked_file_path = os.path.join(OUTPUT_FOLDER, f"{file_name}.csv")
+    # To make sure that we do not miss the correct password, we create a success file
+    # that will contain the correct password if found
+    success_file_path = os.path.join(OUTPUT_FOLDER, f"{file_name}_success.csv")
 
     num_checked = 0
     num_skipped = 0
@@ -269,7 +272,8 @@ def test_passwords(excel_file, password_list: Generator[str]):
     # This opens both the Excel file we will be attempting to find the password for
     # and the file we will be writing the checked passwords to
     with open(excel_file, "rb") as f, \
-        open(checked_file_path, mode='a', newline='', encoding='utf-8') as checked_file:
+        open(checked_file_path, mode='a', newline='', encoding='utf-8') as checked_file, \
+        open(success_file_path, mode='a', newline='', encoding='utf-8') as success_file:
         file = OOXMLFile(f)
 
         for password in password_list:
@@ -288,6 +292,8 @@ def test_passwords(excel_file, password_list: Generator[str]):
                 end_time = time.perf_counter()
                 elapsed_time = end_time - start_time
 
+                # If the password is correct, write it to the success file and print the result
+                success_file.write(f"{password}\n")
                 print(f"***SUCCESS*** The correct password is: '{password}'")
                 print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords in {elapsed_time:.2f} seconds ({(num_checked+num_skipped)/elapsed_time} pwds/sec).")
                 return
