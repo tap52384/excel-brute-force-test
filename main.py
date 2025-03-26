@@ -5,7 +5,7 @@ import os
 import string
 import sys
 import time
-from typing import Generator, List, Optional
+from typing import Generator, List, Optional, Tuple
 from msoffcrypto.format.ooxml import OOXMLFile
 import msoffcrypto
 
@@ -101,8 +101,9 @@ def generate_passwords(
 ) -> Generator[str, None, None]:
     """
     Generates all possible passwords based on the provided prefixes, suffixes, and maximum length.
-    The first character of the password is always a letter if no prefix is provided. Therefore, if
-    you want to generate passwords that start with a specific letter, you must provide a prefix.
+    All case variations are created for the prefixes and suffixes regardless of max_length.
+    If no suffixes are specified, generate all case variations of the prefixes alone and then
+    generate all passwords using each prefix up to the max_length.
 
     :param prefixes: List of prefixes to use (default is None).
     :param suffixes: List of suffixes to use (default is None).
@@ -116,20 +117,34 @@ def generate_passwords(
     # Valid ASCII characters (excluding whitespace and control characters)
     valid_chars = letters + string.digits + string.punctuation
 
-    # Prepare prefix variations (or just an empty string if no prefixes)
+    # Prepare all case variations for prefixes (or just an empty string if no prefixes)
     prefixes = prefixes or [""]
     prefix_variations = set()
     for prefix in prefixes:
         prefix_variations.update(case_variations(prefix))
 
-    # Prepare suffix variations (or just an empty string if no suffixes)
+    # Prepare all case variations for suffixes (or just an empty string if no suffixes)
     suffixes = suffixes or [""]
     suffix_variations = set()
     for suffix in suffixes:
         suffix_variations.update(case_variations(suffix))
 
-    # Set to track unique passwords
-    seen_passwords = set()
+    # If no suffixes are specified, generate all case variations of the prefixes alone
+    if not suffixes or suffixes == [""]:
+        for prefix in prefix_variations:
+            if len(prefix) <= max_length:
+                yield prefix
+
+        # Generate all passwords using each prefix up to the max_length
+        for prefix in prefix_variations:
+            remaining_length = max_length - len(prefix)
+            if remaining_length > 0:
+                for length in range(1, remaining_length + 1):
+                    char_pool = [valid_chars] * length
+                    for body_chars in itertools.product(*char_pool):
+                        body = ''.join(body_chars)
+                        yield prefix + body
+        return  # Skip the rest of the logic since suffixes are not specified
 
     # Generate passwords by combining prefixes, generated body, and suffixes
     for prefix in prefix_variations:
@@ -138,16 +153,13 @@ def generate_passwords(
 
             # If prefix + suffix fills max_length already
             if total_fixed_length > max_length:
-                continue
-
-            remaining_length = max_length - total_fixed_length
+                remaining_length = 0
+            else:
+                remaining_length = max_length - total_fixed_length
 
             # If there's no space for a body, just yield prefix + suffix
             if remaining_length == 0:
-                full_password = prefix + suffix
-                if full_password not in seen_passwords:
-                    seen_passwords.add(full_password)
-                    yield full_password
+                yield prefix + suffix
                 continue
 
             # Character pools: first char special if no prefix
@@ -162,31 +174,25 @@ def generate_passwords(
 
                 for body_chars in itertools.product(*char_pool):
                     body = ''.join(body_chars)
+                    yield prefix + body + suffix
 
-                    # Generate all case variations for the body
-                    for body_variation in case_variations(body):
-                        full_password = prefix + body_variation + suffix
-                        if full_password not in seen_passwords:
-                            seen_passwords.add(full_password)
-                            yield full_password
+# def generate_all_passwords(max_length: int = 10) -> Generator[str, None, None]:
+#     """
+#     Generates all possible passwords starting with a letter and up to a given length.
+#     Includes all ASCII printable characters except whitespace and control characters.
 
-def generate_all_passwords(max_length: int = 10) -> Generator[str, None, None]:
-    """
-    Generates all possible passwords starting with a letter and up to a given length.
-    Includes all ASCII printable characters except whitespace and control characters.
+#     :param max_length: Maximum length of the passwords to generate (default is 10).
+#     :return: A generator yielding password combinations.
+#     """
 
-    :param max_length: Maximum length of the passwords to generate (default is 10).
-    :return: A generator yielding password combinations.
-    """
+#     # Define the character set: all printable ASCII characters except whitespace and control chars
+#     valid_chars = string.ascii_letters + string.digits + string.punctuation
 
-    # Define the character set: all printable ASCII characters except whitespace and control chars
-    valid_chars = string.ascii_letters + string.digits + string.punctuation
-
-    # Generate passwords starting with a letter and up to max_length characters
-    for length in range(1, max_length + 1):
-        for password in itertools.product(valid_chars, repeat=length):
-            if password[0].isalpha():  # Ensure the password starts with a letter
-                yield ''.join(password)
+#     # Generate passwords starting with a letter and up to max_length characters
+#     for length in range(1, max_length + 1):
+#         for password in itertools.product(valid_chars, repeat=length):
+#             if password[0].isalpha():  # Ensure the password starts with a letter
+#                 yield ''.join(password)
 
 
 
@@ -245,6 +251,26 @@ def get_checked_passwords(file_path:str) -> set[str]:
 
     return checked_passwords
 
+def print_completion_message(start_time, password:str, num_checked:int, num_skipped:int):
+    """
+    Print a completion message indicating that the script has finished running.
+    :param start_time: The time when the script started running.
+    :param password: The password that was found (if any).
+    :param num_checked: The number of passwords that were checked.
+    :param num_skipped: The number of passwords that were skipped.
+    :return: None
+    """
+
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+    if password:
+        print(f"***SUCCESS*** The correct password is: '{password}'")
+    else:
+        print("None of the passwords worked.")
+
+    print(f"""\nChecked {num_checked} passwords, skipped {num_skipped} passwords in
+          {elapsed_time:.2f} seconds ({(num_checked+num_skipped)/elapsed_time} pwds/sec).""")
+
 
 def test_passwords(excel_file, password_list: Generator[str]):
     """
@@ -266,8 +292,14 @@ def test_passwords(excel_file, password_list: Generator[str]):
     num_checked = 0
     num_skipped = 0
 
+    # li = list(password_list)
+    # length = len(li)
+
+
     # Used to determine how long it takes to check all of the passwords
     start_time = time.perf_counter()
+
+    # print(f"Total passwords to check: {length}")
 
     # This opens both the Excel file we will be attempting to find the password for
     # and the file we will be writing the checked passwords to
@@ -276,33 +308,39 @@ def test_passwords(excel_file, password_list: Generator[str]):
         open(success_file_path, mode='a', newline='', encoding='utf-8') as success_file:
         file = OOXMLFile(f)
 
+        # print(f"Checking {length} passwords...")
+
         for password in password_list:
+
+            # print('Current password:', password)
+
             try:
 
                 # Skip the password if it has already been checked
                 if password in checked_passwords:
+                    # print('Skipping already checked password:', password)
                     num_skipped += 1
                     continue
+
+                # Print the current password being checked
+                # print(f"Checking password: '{password}'")
 
                 # This will attempt to verify the password
                 # https://msoffcrypto-tool.readthedocs.io/en/latest/index.html#id1
                 num_checked += 1
                 file.load_key(password=password, verify_password=True)
 
-                end_time = time.perf_counter()
-                elapsed_time = end_time - start_time
-
                 # If the password is correct, write it to the success file and print the result
                 success_file.write(f"{password}\n")
-                print(f"***SUCCESS*** The correct password is: '{password}'")
-                print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords in {elapsed_time:.2f} seconds ({(num_checked+num_skipped)/elapsed_time} pwds/sec).")
+
+                print_completion_message(start_time, password, num_checked, num_skipped)
                 return
 
             except msoffcrypto.exceptions.DecryptionError:
                 # Even printing the error message can be a security risk and slow things down, so
                 # do nothing
-                pass
                 # print(f"DecryptionError: Failed to verify password '{password}'. {e}")
+                pass
             except KeyboardInterrupt:
                 print("KeyboardInterrupt: Stopping password check because CTRL + C was pressed.")
                 # This break is required to stop the program! Otherwise, it will continue to
@@ -314,10 +352,8 @@ def test_passwords(excel_file, password_list: Generator[str]):
             # Write the password to the checked file
             checked_file.write(f"{password}\n")
 
-    print("None of the passwords worked.")
-    end_time = time.perf_counter()
-    elapsed_time = end_time - start_time
-    print(f"\nChecked {num_checked} passwords, skipped {num_skipped} passwords in {elapsed_time:.2f} seconds ({(num_checked+num_skipped)/elapsed_time} pwds/sec).")
+    # Print the completion message if no password was found
+    print_completion_message(start_time, "", num_checked, num_skipped)
 
 def main():
     """
@@ -345,10 +381,14 @@ def main():
 
     print(f"File is encrypted: {office_file}")
 
+    print("Generating passwords based on prefixes, suffixes, and max_length...")
+
     # 2. Now that we have confirmed the file is encrypted, we can generate passwords
     # By specifying only prefixes, we can generate all passwords with the given prefixes
     # Therefore, to generate all passwords starting with a letter, add the letter as a prefix
     all_passwords = generate_passwords(prefixes, suffixes, max_length=max_length)
+
+    print("Passwords have been generated")
 
     # 3. Loop through the password list and test all of the passwords until we find the right one
     test_passwords(excel_file=office_file, password_list=all_passwords)
